@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import tifffile
 from pycocotools.coco import COCO
-from accelerate import Accelerator
+from accelerate import Accelerator, DistributedDataParallelKwargs
 import argparse
 
 import torch
@@ -105,6 +105,7 @@ def train_fn(model, epochs, learning_rate, plain_loader, prompt_loader, accelera
         print(f'Epoch {epoch+1}, Loss: {statistics.mean(epoch_losses)}')
 
         # Save the model every epoch to avoid losing progress
+        accelerator.wait_for_everyone()
         torch.save(model.state_dict(), os.path.join(checkpoint_path, f'finetune_sam_{model_using}_epoch_{(epoch+1+resume_count):03d}.pt'))
 
 def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
@@ -220,7 +221,8 @@ def main():
     val_label_path = os.path.join(label_path, 'Test')
 
     # Accelerator
-    accelerator = Accelerator()
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
     # Load the data
     train_files = load_filter_data(train_path, train_label_path)
