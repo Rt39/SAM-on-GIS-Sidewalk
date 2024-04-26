@@ -6,3 +6,5 @@ transformers
 monai
 tqdm
 jupyter
+pycocotools
+accelerate
