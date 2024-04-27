@@ -85,7 +85,6 @@ def load_filter_data(img_dir: str, label_dir: str):
 # First loading model and processor may download, so we should
 # do it on the main process first to avoid multiple downloads
 # and data corruption
-@accelerator.main_process_first
 def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: str, resume_training: bool):
     """
     Load the SAM model and processor for fine-tuning.
@@ -103,18 +102,19 @@ def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: 
     """
     model_name = f"facebook/sam-vit-{model_using}"
 
-    sam_processor = SamProcessor.from_pretrained(model_name, cache_dir=data_path)
-    sam_model = SamModel.from_pretrained(model_name, cache_dir=data_path)
-    resume_count = 0
-    if resume_training:
-        checkpoints = [os.path.join(checkpoint_path, f) for f in os.listdir(checkpoint_path) if f.startswith(f'finetune_sam_{model_using}_epoch_')]
-        if not checkpoints:
-            print("No checkpoint found to resume training. Using original model.")
-        else:
-            checkpoints.sort()
-            sam_model.load_state_dict(torch.load(checkpoints[-1]))
-            resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
-    return sam_model, sam_processor, resume_count
+    with accelerator.main_process_first():
+        sam_processor = SamProcessor.from_pretrained(model_name, cache_dir=data_path)
+        sam_model = SamModel.from_pretrained(model_name, cache_dir=data_path)
+        resume_count = 0
+        if resume_training:
+            checkpoints = [os.path.join(checkpoint_path, f) for f in os.listdir(checkpoint_path) if f.startswith(f'finetune_sam_{model_using}_epoch_')]
+            if not checkpoints:
+                print("No checkpoint found to resume training. Using original model.")
+            else:
+                checkpoints.sort()
+                sam_model.load_state_dict(torch.load(checkpoints[-1]))
+                resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
+        return sam_model, sam_processor, resume_count
 
 def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, checkpoint_path: str, model_using: str, resume_count: int = 0):
     """
