@@ -23,6 +23,15 @@ accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 # Download the data only on the main process to avoid data corruption
 @accelerator.on_main_process
 def download_data(data_path: str):
+    """
+    Downloads and extracts the necessary data for the project.
+
+    Args:
+        data_path (str): The path where the data will be downloaded and extracted.
+
+    Returns:
+        None
+    """
     train_url = 'https://drive.google.com/file/d/1De6cOV0UtS310-vkILWpmY7hiJZRSU9Y/view?usp=drive_link'
     label_url = 'https://drive.google.com/file/d/1T8RDNBtxuBidm9ttNW9ShauDB49dBjWH/view?usp=drive_link'
     val_url = 'https://drive.google.com/file/d/1MFLm_5c0G6CUGNx2o2wrwGAKZHvUBCTI/view?usp=drive_link'
@@ -59,6 +68,18 @@ def download_data(data_path: str):
         gdown.download(DVRPC_val_url, DVRPC_val_path, fuzzy=True, quiet=False, resume=True)
 
 def load_filter_data(img_dir: str, label_dir: str):
+    """
+    Load and filter data from the given image and label directories,
+    returning only the files that its mask is not empty (i.e. has at least one pixel with value > 0)
+
+    Args:
+        img_dir (str): The directory path containing the images of sidewalks.
+        label_dir (str): The directory path containing the masks of data.
+
+    Returns:
+        list: A list of file names contains sidewalks (i.e. its mask has at least one pixel with value > 0)
+
+    """
     return [f for f in os.listdir(img_dir) if (f.endswith('.tif') and np.max(tifffile.imread(os.path.join(label_dir, f))) > 0)]
 
 # First loading model and processor may download, so we should
@@ -66,6 +87,20 @@ def load_filter_data(img_dir: str, label_dir: str):
 # and data corruption
 @accelerator.main_process_first
 def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: str, resume_training: bool):
+    """
+    Load the SAM model and processor for fine-tuning.
+
+    Args:
+        model_using (str): The name of the model to use.
+        data_path (str): The path to the data directory.
+        checkpoint_path (str): The path to the checkpoint directory.
+        resume_training (bool): Whether to resume training from a checkpoint.
+
+    Returns:
+        sam_model (SamModel): The loaded SAM model.
+        sam_processor (SamProcessor): The loaded SAM processor.
+        resume_count (int): The number of epochs to resume training from, only meaningful if resume_training is True.
+    """
     model_name = f"facebook/sam-vit-{model_using}"
 
     sam_processor = SamProcessor.from_pretrained(model_name, cache_dir=data_path)
@@ -81,7 +116,20 @@ def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: 
             resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
     return sam_model, sam_processor, resume_count
 
-def train_fn(model, epochs, learning_rate, plain_loader, prompt_loader, accelerator, checkpoint_path, model_using: str, resume_count: int = 0):
+def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, checkpoint_path: str, model_using: str, resume_count: int = 0):
+    """
+    Trains the model using the given data loaders for a specified number of epochs.
+
+    Args:
+        model (torch.nn.Module): The model to be trained.
+        epochs (int): The number of epochs to train the model for.
+        learning_rate (float): The learning rate for the optimizer.
+        plain_loader (torch.utils.data.DataLoader): The data loader for plain images.
+        prompt_loader (torch.utils.data.DataLoader): The data loader for images with bbox prompt.
+        checkpoint_path (str): The path to save the model checkpoints.
+        model_using (str): The name of the model being used.
+        resume_count (int, optional): The count of resumed training. Defaults to 0.
+    """
     optimizer = Adam(model.parameters(), lr=learning_rate)
     loss_fn = DiceLoss(sigmoid=True, squared_pred=True)
 
@@ -105,7 +153,7 @@ def train_fn(model, epochs, learning_rate, plain_loader, prompt_loader, accelera
             optimizer.step()
             epoch_losses.append(loss.item())
 
-        print("Traing without prompt")
+        print("Training without prompt")
         print(f'Epoch {epoch+1}/{epochs}, Loss: {statistics.mean(epoch_losses)}')
 
         epoch_losses = []
@@ -125,7 +173,7 @@ def train_fn(model, epochs, learning_rate, plain_loader, prompt_loader, accelera
             optimizer.step()
             epoch_losses.append(loss.item())
 
-        print("Traing with prompt")
+        print("Training with prompt")
         print(f'Epoch {epoch+1}, Loss: {statistics.mean(epoch_losses)}')
 
         # Save the model every epoch to avoid losing progress
@@ -133,13 +181,21 @@ def train_fn(model, epochs, learning_rate, plain_loader, prompt_loader, accelera
         torch.save(model.state_dict(), os.path.join(checkpoint_path, f'finetune_sam_{model_using}_epoch_{(epoch+1+resume_count):03d}.pt'))
 
 def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
+    """
+    Evaluate the model on the validation datasets.
+
+    Args:
+        model (torch.nn.Module): The model to be evaluated.
+        val_dataloader_plain (torch.utils.data.DataLoader): The dataloader for plain images.
+        val_dataloader_prompt (torch.utils.data.DataLoader): The dataloader for images with bbox prompt.
+    """
     loss_fn = DiceLoss(sigmoid=True, squared_pred=True)
 
     val_losses = []
     for batch in tqdm(val_dataloader_plain):
         with torch.no_grad():
             outputs = model(pixel_values=batch['pixel_values'],
-                                multimask_output=False)
+                            multimask_output=False)
             predicted_masks = outputs.pred_masks.squeeze(1)
             ground_truth_masks = batch['labels'].float()
             loss = loss_fn(predicted_masks, ground_truth_masks.unsqueeze(1))
@@ -152,8 +208,8 @@ def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
     for batch in tqdm(val_dataloader_prompt):
         with torch.no_grad():
             outputs = model(pixel_values=batch['pixel_values'],
-                                input_boxes=batch['input_boxes'],
-                                multimask_output=False)
+                            input_boxes=batch['input_boxes'],
+                            multimask_output=False)
             predicted_masks = outputs.pred_masks.squeeze(1)
             ground_truth_masks = batch['labels'].float()
             loss = loss_fn(predicted_masks, ground_truth_masks.unsqueeze(1))
@@ -216,9 +272,9 @@ def main():
         description="Finetune a pretrained SAM (Segment Anything Model) model on sidewalk data.",
     )
     arg_parser.add_argument("-m", "--model", type=str, default="base", help='Model to use for training, can be either "base" (using model "facebook/sam-vit-base") or "huge" (using model "facebook/sam-vit-base"). (default: base)')
-    arg_parser.add_argument("-b", "--batch_size", type=int, default=2, help="Batch size for training.")
-    arg_parser.add_argument("-e", "--epochs", type=int, default=5, help="Number of epochs for training.")
-    arg_parser.add_argument("-l", "--learning_rate", type=float, default=1e-5, help="Learning rate for training.")
+    arg_parser.add_argument("-b", "--batch_size", type=int, default=2, help="Batch size for training. (default: 2)")
+    arg_parser.add_argument("-e", "--epochs", type=int, default=5, help="Number of epochs for training. (default: 5)")
+    arg_parser.add_argument("-l", "--learning_rate", type=float, default=1e-5, help="Learning rate for training. (default: 1e-5)")
     arg_parser.add_argument("-c", "--resume_training", action="store_true", help="Resume training from a checkpoint.")
     arg_parser.add_argument("--checkpoint_path", type=str, default=os.path.join("..", "models"), help="Path to save checkpoints.")
     arg_parser.add_argument("--data_path", type=str, default=os.path.join("..", "data"), help="Path to save data.")
@@ -261,9 +317,11 @@ def main():
     val_dataloader_plain = DataLoader(val_dataset_plain, batch_size=args.batch_size, shuffle=False)
     val_dataloader_prompt = DataLoader(val_dataset_prompt, batch_size=args.batch_size, shuffle=False)
 
+    os.makedirs(args.checkpoint_path, exist_ok=True)
+
     # Train the model
     sam_model.to(accelerator.device).train()
-    train_fn(sam_model, args.epochs, args.learning_rate, train_dataloader_plain, train_dataloader_prompt, accelerator, args.checkpoint_path, model_using, resume_count=resume_count if args.resume_training else 0)
+    train_fn(sam_model, args.epochs, args.learning_rate, train_dataloader_plain, train_dataloader_prompt, args.checkpoint_path, model_using, resume_count=resume_count if args.resume_training else 0)
 
     # Evaluate the model
     sam_model.eval()
