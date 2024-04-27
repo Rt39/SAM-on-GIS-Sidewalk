@@ -276,8 +276,8 @@ def main():
     arg_parser.add_argument("-e", "--epochs", type=int, default=5, help="Number of epochs for training. (default: 5)")
     arg_parser.add_argument("-l", "--learning_rate", type=float, default=1e-5, help="Learning rate for training. (default: 1e-5)")
     arg_parser.add_argument("-c", "--resume_training", action="store_true", help="Resume training from a checkpoint.")
-    arg_parser.add_argument("--checkpoint_path", type=str, default=os.path.join("..", "models"), help="Path to save checkpoints.")
-    arg_parser.add_argument("--data_path", type=str, default=os.path.join("..", "data"), help="Path to save data.")
+    arg_parser.add_argument("--checkpoint_path", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models"), help="Path to save checkpoints.")
+    arg_parser.add_argument("--data_path", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"), help="Path to save data.")
 
     args = arg_parser.parse_args()
 
