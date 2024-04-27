@@ -16,6 +16,12 @@ from monai.losses import DiceLoss
 from tqdm import tqdm
 import statistics
 
+# Accelerator
+ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
+
+# Download the data only on the main process to avoid data corruption
+@accelerator.on_main_process
 def download_data(data_path: str):
     train_url = 'https://drive.google.com/file/d/1De6cOV0UtS310-vkILWpmY7hiJZRSU9Y/view?usp=drive_link'
     label_url = 'https://drive.google.com/file/d/1T8RDNBtxuBidm9ttNW9ShauDB49dBjWH/view?usp=drive_link'
@@ -55,7 +61,25 @@ def download_data(data_path: str):
 def load_filter_data(img_dir: str, label_dir: str):
     return [f for f in os.listdir(img_dir) if (f.endswith('.tif') and np.max(tifffile.imread(os.path.join(label_dir, f))) > 0)]
 
+# First loading model and processor may download, so we should
+# do it on the main process first to avoid multiple downloads
+# and data corruption
+@accelerator.main_process_first
+def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: str, resume_training: bool):
+    model_name = f"facebook/sam-vit-{model_using}"
 
+    sam_processor = SamProcessor.from_pretrained(model_name, cache_dir=data_path)
+    sam_model = SamModel.from_pretrained(model_name, cache_dir=data_path)
+    resume_count = 0
+    if resume_training:
+        checkpoints = [os.path.join(checkpoint_path, f) for f in os.listdir(checkpoint_path) if f.startswith(f'finetune_sam_{model_using}_epoch_')]
+        if not checkpoints:
+            print("No checkpoint found to resume training. Using original model.")
+        else:
+            checkpoints.sort()
+            sam_model.load_state_dict(torch.load(checkpoints[-1]))
+            resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
+    return sam_model, sam_processor, resume_count
 
 def train_fn(model, epochs, learning_rate, plain_loader, prompt_loader, accelerator, checkpoint_path, model_using: str, resume_count: int = 0):
     optimizer = Adam(model.parameters(), lr=learning_rate)
@@ -207,7 +231,6 @@ def main():
     if model_using not in ["base", "huge"]:
         print("Invalid model type. Please use either 'base' or 'huge'.")
         sys.exit()
-    model_name = f"facebook/sam-vit-{model_using}"
 
     # Prepare data
     os.makedirs(args.data_path, exist_ok=True)
@@ -220,25 +243,12 @@ def main():
     train_label_path = os.path.join(label_path, 'Train')
     val_label_path = os.path.join(label_path, 'Test')
 
-    # Accelerator
-    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
-
     # Load the data
     train_files = load_filter_data(train_path, train_label_path)
     val_files = load_filter_data(val_path, val_label_path)
 
     # Load model and processor
-    sam_processor = SamProcessor.from_pretrained(model_name, cache_dir=args.data_path)
-    sam_model = SamModel.from_pretrained(model_name, cache_dir=args.data_path)
-    if args.resume_training:
-        checkpoints = [os.path.join(args.checkpoint_path, f) for f in os.listdir(args.checkpoint_path) if f.startswith(f'finetune_sam_{model_using}_epoch_')]
-        if not checkpoints:
-            print("No checkpoint found to resume training. Using original model.")
-        else:
-            checkpoints.sort()
-            sam_model.load_state_dict(torch.load(checkpoints[-1]))
-            resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
+    sam_model, sam_processor, resume_count = load_model_and_processor(model_using, args.data_path, args.checkpoint_path, args.resume_training)
 
     # Create datasets and dataloaders
     train_dataset_plain = SidewalkDatasetPlain(train_path, train_label_path, train_files, sam_processor)
