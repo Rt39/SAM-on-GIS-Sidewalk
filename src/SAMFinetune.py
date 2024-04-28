@@ -125,7 +125,7 @@ def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: 
                 checkpoints.sort()
                 # Load using accelerator
                 # sam_model.load_state_dict(torch.load(checkpoints[-1]))
-                resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
+                resume_count = int(checkpoints[-1].split('_')[-1])
         return sam_model, sam_processor, resume_count
 
 def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, checkpoint_path: str, resume_count: int = 0):
