@@ -273,6 +273,9 @@ class SidewalkDatasetBboxPrompt(Dataset):
         self.transform = transform
 
     def __len__(self):
+        global DEBUG
+        if DEBUG:
+            return 10
         return len(self.ann_ids)
     
     def __getitem__(self, idx):
