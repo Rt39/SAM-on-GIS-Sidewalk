@@ -16,6 +16,9 @@ from monai.losses import DiceLoss
 from tqdm import tqdm
 import statistics
 
+# Accelerator
+ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
 # Download the data only on the main process to avoid data corruption
 @accelerator.on_main_process
@@ -129,6 +132,8 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
     """
     optimizer = Adam(model.parameters(), lr=learning_rate)
     loss_fn = DiceLoss(sigmoid=True, squared_pred=True)
+
+    global checkpoint_name
 
     model, optimizer, plain_loader, prompt_loader = accelerator.prepare(model, optimizer, plain_loader, prompt_loader)
     if resume_count > 0:
@@ -282,10 +287,6 @@ def main():
 
     args = arg_parser.parse_args()
 
-    # Accelerator
-    global accelerator
-    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
     # Get the model to use
     model_using = args.model
