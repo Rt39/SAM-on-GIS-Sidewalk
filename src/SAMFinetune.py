@@ -199,7 +199,7 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
                 # Remove the previous checkpoint if it exists
                 checkpoint_path = os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count))
                 if os.path.exists(checkpoint_path):
-                    os.remove(checkpoint_path)
+                    shutil.rmtree(checkpoint_path)
         accelerator.save_state(output_dir=os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
         # torch.save(model.state_dict(), os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
 
@@ -322,7 +322,7 @@ def main():
 
     # Checkpoint name
     global checkpoint_name
-    checkpoint_name = 'finetune_sam_{}_epoch_{}.pt'.format(model_using, '{:03d}')
+    checkpoint_name = 'finetune_sam_{}_epoch_{}'.format(model_using, '{:03d}')
 
     # Prepare data
     os.makedirs(args.data_path, exist_ok=True)
