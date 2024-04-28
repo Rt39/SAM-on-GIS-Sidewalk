@@ -123,9 +123,8 @@ def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: 
                 print("No checkpoint found to resume training. Using original model.")
             else:
                 checkpoints.sort()
-                # Load using accelerator
-                # sam_model.load_state_dict(torch.load(checkpoints[-1]))
-                resume_count = int(checkpoints[-1].split('_')[-1])
+                sam_model.load_state_dict(torch.load(checkpoints[-1]))
+                resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
         return sam_model, sam_processor, resume_count
 
 def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, checkpoint_path: str, resume_count: int = 0):
@@ -147,9 +146,9 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
     global checkpoint_name
 
     model, optimizer, plain_loader, prompt_loader = accelerator.prepare(model, optimizer, plain_loader, prompt_loader)
-    if resume_count > 0:
-        print(f"Resuming training from epoch {resume_count}")
-        accelerator.load_state(os.path.join(checkpoint_path, checkpoint_name.format(resume_count)))
+    # if resume_count > 0:
+    #     print(f"Resuming training from epoch {resume_count}")
+    #     accelerator.load_state(os.path.join(checkpoint_path, checkpoint_name.format(resume_count)))
 
     for epoch in range(epochs):
         epoch_losses = []
@@ -200,8 +199,9 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
                 checkpoint_path = os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count))
                 if os.path.exists(checkpoint_path):
                     shutil.rmtree(checkpoint_path)
-        accelerator.save_state(output_dir=os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
-        # torch.save(model.state_dict(), os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
+                unwrapped_model = accelerator.unwrap_model(model)
+                torch.save(unwrapped_model.state_dict(), checkpoint_path)
+        # accelerator.save_state(output_dir=os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
 
 def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
     """
@@ -322,7 +322,7 @@ def main():
 
     # Checkpoint name
     global checkpoint_name
-    checkpoint_name = 'finetune_sam_{}_epoch_{}'.format(model_using, '{:03d}')
+    checkpoint_name = 'finetune_sam_{}_epoch_{}.pt'.format(model_using, '{:03d}')
 
     # Prepare data
     os.makedirs(args.data_path, exist_ok=True)
