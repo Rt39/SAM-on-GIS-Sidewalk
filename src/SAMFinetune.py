@@ -168,8 +168,9 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
             optimizer.step()
             epoch_losses.append(loss.item())
 
-        print("Training without prompt")
-        print(f'Epoch {epoch+1}/{epochs}, Loss: {statistics.mean(epoch_losses)}')
+        if accelerator.is_main_process:
+            print("Training without prompt")
+            print(f'Epoch {epoch+1}/{epochs}, Loss: {statistics.mean(epoch_losses)}')
 
         epoch_losses = []
         for batch in tqdm(prompt_loader, disable=not accelerator.is_local_main_process):
@@ -188,8 +189,9 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
             optimizer.step()
             epoch_losses.append(loss.item())
 
-        print("Training with prompt")
-        print(f'Epoch {epoch+1}, Loss: {statistics.mean(epoch_losses)}')
+        if accelerator.is_main_process:
+            print("Training with prompt")
+            print(f'Epoch {epoch+1}, Loss: {statistics.mean(epoch_losses)}')
 
         # Save the model every epoch to avoid losing progress
         accelerator.wait_for_everyone()
@@ -226,10 +228,12 @@ def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
             loss = loss_fn(predicted_masks, ground_truth_masks)
             val_losses.append(loss.item())
 
-    print("Validation without prompt")
-    print(f'Validation Loss: {statistics.mean(val_losses)}')
+    accelerator.wait_for_everyone()
+    if accelerator.is_main_process:
+        print("Validation without prompt")
+        print(f'Validation Loss: {statistics.mean(val_losses)}')
 
-    val_losses = []
+    val_losses_prompt = []
     for batch in tqdm(val_dataloader_prompt, disable=not accelerator.is_local_main_process):
         with torch.no_grad():
             outputs = model(pixel_values=batch['pixel_values'],
@@ -238,10 +242,13 @@ def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
             predicted_masks = outputs.pred_masks.squeeze(1)
             ground_truth_masks = batch['labels'].float()
             loss = loss_fn(predicted_masks, ground_truth_masks)
-            val_losses.append(loss.item())
+            val_losses_prompt.append(loss.item())
 
-    print("Validation with prompt")
-    print(f'Validation Loss: {statistics.mean(val_losses)}')
+    accelerator.wait_for_everyone()
+    if accelerator.is_main_process:
+        print("Validation with prompt")
+        print(f'Validation Loss: {statistics.mean(val_losses_prompt)}')
+        print(f'Average Validation Loss: {statistics.mean(val_losses + val_losses_prompt)}')
 
 
 class SidewalkDatasetPlain(Dataset):
