@@ -331,7 +331,7 @@ def main():
 
     # Train the model
     sam_model.to(accelerator.device).train()
-    train_fn(sam_model, args.epochs, args.learning_rate, train_dataloader_plain, train_dataloader_prompt, args.checkpoint_path, model_using, resume_count=resume_count if args.resume_training else 0)
+    train_fn(sam_model, args.epochs, args.learning_rate, train_dataloader_plain, train_dataloader_prompt, args.checkpoint_path, resume_count=resume_count if args.resume_training else 0)
 
     # Evaluate the model
     sam_model.eval()
