@@ -80,6 +80,17 @@ def load_filter_data(img_dir: str, label_dir: str):
         list: A list of file names contains sidewalks (i.e. its mask has at least one pixel with value > 0)
 
     """
+    global DEBUG
+    if DEBUG:
+        ans = []
+        for f in os.listdir(img_dir):
+            if len(ans) > 10:
+                return ans
+            if not f.endswith('.tif'):
+                continue
+            mask = tifffile.imread(os.path.join(label_dir, f))
+            if np.max(mask) > 0:
+                ans.append(f)
     return [f for f in os.listdir(img_dir) if (f.endswith('.tif') and np.max(tifffile.imread(os.path.join(label_dir, f))) > 0)]
 
 # First loading model and processor may download, so we should
@@ -183,6 +194,12 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
 
         # Save the model every epoch to avoid losing progress
         accelerator.wait_for_everyone()
+        with accelerator.main_process_first():
+            if accelerator.is_main_process:
+                # Remove the previous checkpoint if it exists
+                checkpoint_path = os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count))
+                if os.path.exists(checkpoint_path):
+                    os.remove(checkpoint_path)
         accelerator.save_state(output_dir=os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
         # torch.save(model.state_dict(), os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
 
@@ -284,8 +301,12 @@ def main():
     arg_parser.add_argument("-c", "--resume_training", action="store_true", help="Resume training from a checkpoint.")
     arg_parser.add_argument("--checkpoint_path", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models"), help="Path to save checkpoints.")
     arg_parser.add_argument("--data_path", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"), help="Path to save data.")
+    arg_parser.add_argument("--debug", action="store_true")
 
     args = arg_parser.parse_args()
+
+    global DEBUG
+    DEBUG = args.debug
 
 
     # Get the model to use
