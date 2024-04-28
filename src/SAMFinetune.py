@@ -8,6 +8,10 @@ from pycocotools.coco import COCO
 from accelerate import Accelerator, DistributedDataParallelKwargs
 import argparse
 
+# Accelerator
+ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import SamModel, SamProcessor
