@@ -296,7 +296,7 @@ def main():
 
     # Checkpoint name
     global checkpoint_name
-    checkpoint_name = 'finetune_sam_{}_epoch_{:03d}.pt'.format(model_using)
+    checkpoint_name = 'finetune_sam_{}_epoch_{}.pt'.format(model_using, '{:03d}')
 
     # Prepare data
     os.makedirs(args.data_path, exist_ok=True)
