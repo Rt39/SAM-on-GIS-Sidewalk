@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import SamModel, SamProcessor
 from torch.optim import Adam
 from monai.losses import DiceLoss
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import statistics
 
 # Accelerator
@@ -153,7 +153,7 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
 
     for epoch in range(epochs):
         epoch_losses = []
-        for batch in tqdm(plain_loader):
+        for batch in tqdm(plain_loader, disable=not accelerator.is_local_main_process):
             # Forward pass
             outputs = model(pixel_values=batch['pixel_values'],
                                 # input_boxes=batch['input_boxes'],
@@ -173,7 +173,7 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
         print(f'Epoch {epoch+1}/{epochs}, Loss: {statistics.mean(epoch_losses)}')
 
         epoch_losses = []
-        for batch in tqdm(prompt_loader):
+        for batch in tqdm(prompt_loader, disable=not accelerator.is_local_main_process):
             # Forward pass
             outputs = model(pixel_values=batch['pixel_values'],
                                 input_boxes=batch['input_boxes'],
@@ -214,8 +214,10 @@ def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
     """
     loss_fn = DiceLoss(sigmoid=True, squared_pred=True)
 
+    model, val_dataloader_plain, val_dataloader_prompt = accelerator.prepare(model, val_dataloader_plain, val_dataloader_prompt)
+
     val_losses = []
-    for batch in tqdm(val_dataloader_plain):
+    for batch in tqdm(val_dataloader_plain, disable=not accelerator.is_local_main_process):
         with torch.no_grad():
             outputs = model(pixel_values=batch['pixel_values'],
                             multimask_output=False)
@@ -228,7 +230,7 @@ def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
     print(f'Validation Loss: {statistics.mean(val_losses)}')
 
     val_losses = []
-    for batch in tqdm(val_dataloader_prompt):
+    for batch in tqdm(val_dataloader_prompt, disable=not accelerator.is_local_main_process):
         with torch.no_grad():
             outputs = model(pixel_values=batch['pixel_values'],
                             input_boxes=batch['input_boxes'],
