@@ -223,7 +223,7 @@ def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
                             multimask_output=False)
             predicted_masks = outputs.pred_masks.squeeze(1)
             ground_truth_masks = batch['labels'].float()
-            loss = loss_fn(predicted_masks, ground_truth_masks.unsqueeze(1))
+            loss = loss_fn(predicted_masks, ground_truth_masks)
             val_losses.append(loss.item())
 
     print("Validation without prompt")
@@ -237,7 +237,7 @@ def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
                             multimask_output=False)
             predicted_masks = outputs.pred_masks.squeeze(1)
             ground_truth_masks = batch['labels'].float()
-            loss = loss_fn(predicted_masks, ground_truth_masks.unsqueeze(1))
+            loss = loss_fn(predicted_masks, ground_truth_masks)
             val_losses.append(loss.item())
 
     print("Validation with prompt")
