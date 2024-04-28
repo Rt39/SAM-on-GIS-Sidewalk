@@ -16,9 +16,9 @@ Here are the command-line arguments you can use with this script:
 
 - `-c` or `--resume_training`: If this argument is included, training will resume from a checkpoint.
 
-- `--checkpoint_path`: The path to save checkpoints. The default is "../models".
+- `--checkpoint_path`: The path to save checkpoints. The default is the "models" directory in the parent directory of the script.
 
-- `--data_path`: The path to save data. The default is "../data".
+- `--data_path`: The path to save data. The default is the "data" directory in the parent directory of the script.
 
 ## Usage
 

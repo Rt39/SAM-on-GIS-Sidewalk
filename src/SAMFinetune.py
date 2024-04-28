@@ -16,9 +16,6 @@ from monai.losses import DiceLoss
 from tqdm import tqdm
 import statistics
 
-# Accelerator
-ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
 # Download the data only on the main process to avoid data corruption
 @accelerator.on_main_process
@@ -112,11 +109,12 @@ def load_model_and_processor(model_using: str, data_path: str, checkpoint_path: 
                 print("No checkpoint found to resume training. Using original model.")
             else:
                 checkpoints.sort()
-                sam_model.load_state_dict(torch.load(checkpoints[-1]))
+                # Load using accelerator
+                # sam_model.load_state_dict(torch.load(checkpoints[-1]))
                 resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
         return sam_model, sam_processor, resume_count
 
-def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, checkpoint_path: str, model_using: str, resume_count: int = 0):
+def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, checkpoint_path: str, resume_count: int = 0):
     """
     Trains the model using the given data loaders for a specified number of epochs.
 
@@ -127,13 +125,15 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
         plain_loader (torch.utils.data.DataLoader): The data loader for plain images.
         prompt_loader (torch.utils.data.DataLoader): The data loader for images with bbox prompt.
         checkpoint_path (str): The path to save the model checkpoints.
-        model_using (str): The name of the model being used.
         resume_count (int, optional): The count of resumed training. Defaults to 0.
     """
     optimizer = Adam(model.parameters(), lr=learning_rate)
     loss_fn = DiceLoss(sigmoid=True, squared_pred=True)
 
     model, optimizer, plain_loader, prompt_loader = accelerator.prepare(model, optimizer, plain_loader, prompt_loader)
+    if resume_count > 0:
+        print(f"Resuming training from epoch {resume_count}")
+        accelerator.load_state(os.path.join(checkpoint_path, checkpoint_name.format(resume_count)))
 
     for epoch in range(epochs):
         epoch_losses = []
@@ -178,7 +178,8 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
 
         # Save the model every epoch to avoid losing progress
         accelerator.wait_for_everyone()
-        torch.save(model.state_dict(), os.path.join(checkpoint_path, f'finetune_sam_{model_using}_epoch_{(epoch+1+resume_count):03d}.pt'))
+        accelerator.save_state(output_dir=os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
+        # torch.save(model.state_dict(), os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
 
 def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
     """
@@ -281,12 +282,20 @@ def main():
 
     args = arg_parser.parse_args()
 
+    # Accelerator
+    global accelerator
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
     # Get the model to use
     model_using = args.model
     if model_using not in ["base", "huge"]:
         print("Invalid model type. Please use either 'base' or 'huge'.")
         sys.exit()
+
+    # Checkpoint name
+    global checkpoint_name
+    checkpoint_name = 'finetune_sam_{}_epoch_{:03d}.pt'.format(model_using)
 
     # Prepare data
     os.makedirs(args.data_path, exist_ok=True)
