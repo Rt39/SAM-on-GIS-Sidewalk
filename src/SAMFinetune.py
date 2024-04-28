@@ -8,6 +8,10 @@ from pycocotools.coco import COCO
 from accelerate import Accelerator, DistributedDataParallelKwargs
 import argparse
 
+# Accelerator
+ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import SamModel, SamProcessor
@@ -130,6 +134,8 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
     optimizer = Adam(model.parameters(), lr=learning_rate)
     loss_fn = DiceLoss(sigmoid=True, squared_pred=True)
 
+    global checkpoint_name
+    
     model, optimizer, plain_loader, prompt_loader = accelerator.prepare(model, optimizer, plain_loader, prompt_loader)
     if resume_count > 0:
         print(f"Resuming training from epoch {resume_count}")
@@ -282,10 +288,6 @@ def main():
 
     args = arg_parser.parse_args()
 
-    # Accelerator
-    global accelerator
-    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
-    accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
     # Get the model to use
     model_using = args.model
