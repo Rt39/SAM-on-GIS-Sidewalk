@@ -139,3 +139,7 @@ Change the name `facebook/sam-vit-base` and `finetune_sam_base_epoch_001.pt` to 
 ## ScreenShots for fineturing
 
 ![](./images/Finetune.png)
+
+## Finetuned Results
+
+Results can be found in `src/GIS.ipynb`
