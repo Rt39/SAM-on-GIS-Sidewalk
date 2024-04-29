@@ -198,12 +198,12 @@ def train_fn(model, epochs: int, learning_rate, plain_loader, prompt_loader, che
         with accelerator.main_process_first():
             if accelerator.is_main_process:
                 # Remove the previous checkpoint if it exists
-                checkpoint_path = os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count))
-                if os.path.exists(checkpoint_path):
-                    shutil.rmtree(checkpoint_path)
+                full_path = os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count))
+                if os.path.exists(full_path):
+                    os.remove(full_path)
                 unwrapped_model = accelerator.unwrap_model(model)
-                torch.save(unwrapped_model.state_dict(), checkpoint_path)
-        # accelerator.save_state(output_dir=os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
+                torch.save(unwrapped_model.state_dict(), full_path)
+        # accelerator.save_state(output_dir=os.path.join(full_path, checkpoint_name.format(epoch+1+resume_count)))
 
 def evaluate_fn(model, val_dataloader_plain, val_dataloader_prompt):
     """
