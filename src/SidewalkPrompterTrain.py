@@ -120,10 +120,16 @@ def train_fn(model, epochs: int, learning_rate, dataloader, checkpoint_path: str
         if accelerator.is_main_process:
             print(f'Epoch {epoch+1}/{epochs}, Loss: {statistics.mean(epoch_losses)}')
 
-            if (epoch+1) % 10 == 0:
-                accelerator.wait_for_everyone()
-                unwrapped_model = accelerator.unwrap_model(model)
-                torch.save(unwrapped_model.state_dict(), os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count)))
+        if (epoch+1) % 10 == 0:
+            accelerator.wait_for_everyone()
+            with accelerator.main_process_first():
+                if accelerator.is_main_process:
+                    # Remove the previous checkpoint if it exists
+                    full_path = os.path.join(checkpoint_path, checkpoint_name.format(epoch+1+resume_count))
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
+                    unwrapped_model = accelerator.unwrap_model(model)
+                    torch.save(unwrapped_model.state_dict(), full_path)
 
 def evaluate_fn(model, dataloader):
     loss_fn = LossFn()
