@@ -91,6 +91,7 @@ def load_model(checkpoint_path: str, resume_training: bool):
             print("No checkpoint found to resume training. Using original model.")
         else:
             checkpoints.sort()
+            print(f"Resuming training from epoch {checkpoints[-1]}")
             model.load_state_dict(torch.load(checkpoints[-1]))
             resume_count = int(checkpoints[-1].split('_')[-1].split('.')[0])
     return model, resume_count
@@ -174,7 +175,7 @@ def main():
     )
     arg_parser.add_argument("-b", "--batch_size", type=int, default=32, help="Batch size for training. (default: 32)")
     arg_parser.add_argument("-e", "--epochs", type=int, default=100, help="Number of epochs for training. (default: 100)")
-    arg_parser.add_argument("-l", "--learning_rate", type=float, default=1e-5, help="Learning rate for training. (default: 1e-5)")
+    arg_parser.add_argument("-l", "--learning_rate", type=float, default=1e-3, help="Learning rate for training. (default: 1e-3)")
     arg_parser.add_argument("-c", "--resume_training", action="store_true", help="Resume training from a checkpoint.")
     arg_parser.add_argument("--checkpoint_path", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models"), help="Path to save checkpoints.")
     arg_parser.add_argument("--data_path", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"), help="Path to save data.")
