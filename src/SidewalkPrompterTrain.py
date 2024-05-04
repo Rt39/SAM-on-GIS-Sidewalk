@@ -70,8 +70,6 @@ def download_data(data_path: str):
 def load_filter_data(img_dir: str, label_dir: str):
     global DEBUG
     file_names = []
-    imgs = []
-    centroids = []
     for i, f in enumerate(os.listdir(img_dir)):
         if DEBUG and i >= 10:
             break
@@ -79,9 +77,7 @@ def load_filter_data(img_dir: str, label_dir: str):
             ground_truth = tifffile.imread(os.path.join(label_dir, f))
             if np.max(ground_truth) > 0:
                 file_names.append(f)
-                imgs.append(tifffile.imread(os.path.join(img_dir, f)))
-                centroids.append(calculate_centroids(ground_truth))
-    return file_names, np.array(imgs), np.array(centroids)
+    return file_names
 
 # First loading model and processor may download, so we should
 # do it on the main process first to avoid multiple downloads
@@ -147,9 +143,9 @@ def evaluate_fn(model, dataloader):
         print(f'Validation Loss: {statistics.mean(val_losses)}')
 
 class SidewalkDataset(Dataset):
-    def __init__(self, imgs: np.ndarray, centroids: np.ndarray, files: list, transform=None):
-        self.imgs = imgs
-        self.centroids = centroids
+    def __init__(self, img_dir: str, label_dir: str, files: list, transform=None):
+        self.img_dir = img_dir
+        self.label_dir = label_dir
         self.files = files
         self.transform = transform
 
@@ -157,10 +153,11 @@ class SidewalkDataset(Dataset):
         return len(self.files)
 
     def __getitem__(self, idx):
-        img = self.imgs[idx]
+        img = tifffile.imread(os.path.join(self.img_dir, self.files[idx]))
         file_name = self.files[idx]
         img = np.moveaxis(img, -1, 0)
-        ground_truth = self.centroids[idx]
+        label = tifffile.imread(os.path.join(self.label_dir, self.files[idx]))
+        ground_truth = calculate_centroids(label)
         return {'image': torch.tensor(img).float(), 'ground_truth': torch.tensor(ground_truth).float(), 'file_name': file_name}
 
 
@@ -196,15 +193,15 @@ def main():
     val_label_path = os.path.join(label_path, 'Test')
 
     # Load the data
-    train_files, train_imgs, train_centroids = load_filter_data(train_path, train_label_path)
-    val_files, val_imgs, val_centroids = load_filter_data(val_path, val_label_path)
+    train_files = load_filter_data(train_path, train_label_path)
+    val_files = load_filter_data(val_path, val_label_path)
 
     # Load model and processor
     model, resume_count = load_model(args.checkpoint_path, args.resume_training)
 
     # Create datasets and dataloaders
-    train_dataset = SidewalkDataset(train_imgs, train_centroids, train_files)
-    val_dataset = SidewalkDataset(val_imgs, val_centroids, val_files)
+    train_dataset = SidewalkDataset(train_path, train_label_path, train_files)
+    val_dataset = SidewalkDataset(val_path, val_label_path, val_files)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
