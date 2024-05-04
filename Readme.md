@@ -108,7 +108,7 @@ Here are the command-line arguments you can use with this script:
 To use this script, you would use a command like the following:
 
 ```bash
-accelerate launch src/SAMFinetune.py -m base -b 2 -e 5 -l 1e-5 -c --checkpoint_path ../models --data_path ../data
+accelerate launch SAMFinetune.py -m base -b 2 -e 5 -l 1e-5 -c --checkpoint_path ../models --data_path ../data
 ```
 
 This command would start training with the base model, a batch size of 2, for 5 epochs, with a learning rate of 1e-5, resuming training from a checkpoint, and saving checkpoints and data to the default locations.
@@ -120,7 +120,7 @@ Simply use the command
 docker compose up -d
 ```
 
-And it will do everythin for you.
+And it will do everything for you.
 
 ## Results
 The results will be defaultly stored in `models` folder in the form of `finetune_sam_<model_using>_epoch_<epoch_num>.pt`, where `<model_using>` depends on the `--model` argument you pass to the script. Loading the finetuned model can be done by the following code:
