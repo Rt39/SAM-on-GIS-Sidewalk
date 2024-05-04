@@ -184,13 +184,6 @@ def main():
     global DEBUG
     DEBUG = args.debug
 
-
-    # Get the model to use
-    model_using = args.model
-    if model_using not in ["base", "huge"]:
-        print("Invalid model type. Please use either 'base' or 'huge'.")
-        sys.exit()
-
     # Checkpoint name
     global checkpoint_name
     checkpoint_name = 'sidewalk_prompter_epoch_{}.pt'.format('{:04d}')
