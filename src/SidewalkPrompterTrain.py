@@ -137,12 +137,10 @@ def evaluate_fn(model, dataloader):
     val_losses = []
     for batch in tqdm(dataloader, disable=not accelerator.is_local_main_process):
         with torch.no_grad():
-            outputs = model(pixel_values=batch['pixel_values'],
-                            multimask_output=False)
-            predicted_masks = outputs.pred_masks.squeeze(1)
-            ground_truth_masks = batch['labels'].float()
-            loss = loss_fn(predicted_masks, ground_truth_masks)
-            val_losses.append(loss.item())
+            img, ground_truth = batch['image'], batch['ground_truth']
+            pred = model(img)
+            l = loss_fn(pred, ground_truth)
+            val_losses.append(l.item())
 
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
