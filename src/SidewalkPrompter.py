@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import tifffile
 from torch import nn
-from torchvision.models import resnet18, resnet34
+from torchvision.models import resnet18, resnet34, resnet50
 
 def calculate_centroids(image_label: np.ndarray) -> np.ndarray:
     width, height = image_label.shape
@@ -39,8 +39,8 @@ def calculate_centroids(image_label: np.ndarray) -> np.ndarray:
 class SidewalkPrompter(nn.Module):
     def __init__(self):
         super(SidewalkPrompter, self).__init__()
-        self.resnet = resnet34()
-        self.resnet.fc = nn.Linear(in_features=512, out_features=192, bias=True)
+        self.resnet = resnet50()
+        self.resnet.fc = nn.Linear(in_features=2048, out_features=192, bias=True)
         self.sigmoid = nn.Sigmoid()
         
     def forward(self, x):
