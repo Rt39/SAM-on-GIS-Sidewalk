@@ -143,3 +143,28 @@ Change the name `facebook/sam-vit-base` and `finetune_sam_base_epoch_001.pt` to 
 ## Finetuned Results
 
 Results can be found in `src/GIS.ipynb`
+
+## Milestone 5 Sidewalk Prompter
+
+In order to generate prompt for SAM for better segmentation, we propose a deep learning model based on ResNet-50. The structure is shown in the figure.
+
+![](./images/structure.png)
+
+The whole process is decribed as follows:
+
+1. Divide the $256\times 256$ mask of sidewalk into $8\times 8=64$ grids. In each grid, out goal is to predict the centroid of sidewalk. If there is no sidewalk mask in this grid, there will be no centroid.
+
+2. The centroids will be represented as a $8\times 8\times 3$ matrix, where the first two dimensions represents the $8\times 8$ grids in the image, and the last dimension is the form of $[x,y,confidence]$, where $x$ and $y$ is the coordinates of the centroid in the relavent grid, and $confidence\in [0,1]$ is the confidence of the grid contains a centroid.
+
+3. The loss function is designed as follows:
+$$
+L = \sum_{grid}\begin{cases}
+\mathrm{MSE}(\hat{x}, x)+\mathrm{MSE}(\hat{y}, y) + \lambda \mathrm{BCE}(\hat{c}, c), & \text{if } c=1; \\
+\lambda \mathrm{BCE}(\hat{c}, c), & \text{otherwise, }
+\end{cases}
+$$
+where $c$ is the confidence, MSE is the mean square error funcion, BCE is the binary cross entropy error. $\lambda$ is a hyper-parameter, which default is 5.
+
+## Shiny App
+
+![](./images/ShinyApp.mp4)
