@@ -167,4 +167,8 @@ where $c$ is the confidence, MSE is the mean square error funcion, BCE is the bi
 
 ## Shiny App
 
-![](./images/ShinyApp.mp4)
+<video width="320" height="240" controls>
+  <source src="./images/ShinyApp.mp4" type="video/mp4">
+</video>
+
+Please check `./images/ShinyApp.mp4` if you can't see the video here.
