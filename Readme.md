@@ -22,6 +22,8 @@
         FinetuneSAM_Colab.ipynb # Finetune using Google Colab
         GIS.ipynb               # Results showing
         SAMFinetune.py          # Finetune using python script and 🤗 Accelerate
+        PrompterTrain_Colab.ipynb   # AutoPrompter Training using Google Colab
+        PrompterTrain.ipynb         # AutoPrompter Training locally
 ```
 
 ## Running Instructions
@@ -144,7 +146,7 @@ Change the name `facebook/sam-vit-base` and `finetune_sam_base_epoch_001.pt` to 
 
 Results can be found in `src/GIS.ipynb`
 
-## Milestone 5 Sidewalk Prompter
+## Sidewalk Auto Prompter
 
 In order to generate prompt for SAM for better segmentation, we propose a deep learning model based on ResNet-50. The structure is shown in the figure.
 
