@@ -1,4 +1,4 @@
-# CS-GY-6613-Project
+# SAM on GIS Sidewalk
 
 ## File Structure
 ```
